@@ -15,6 +15,7 @@
   python3,
   which,
   nodejs,
+  nodejs_22,
   libxext,
   libxdamage,
   libxcomposite,
@@ -85,7 +86,12 @@ qtModule {
     (python3.withPackages (ps: with ps; [ html5lib ]))
     which
     gn
-    nodejs
+    # Node.js 24's new WASI file-descriptor tracking breaks Chromium's
+    # devtools-frontend bundling step on Darwin, which runs rollup via
+    # @rollup/wasm-node (fails with "EBADF: bad file descriptor"). Node.js 22
+    # works, so it is pinned when the build host is Darwin.
+    # TODO: drop this pin once the rollup/Node 24 WASI regression is resolved.
+    (if stdenv.buildPlatform.isDarwin then nodejs_22 else nodejs)
   ]
   ++ lib.optionals stdenv.hostPlatform.isDarwin [
     bootstrap_cmds
