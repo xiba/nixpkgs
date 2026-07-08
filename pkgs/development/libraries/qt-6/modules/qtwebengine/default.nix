@@ -129,6 +129,10 @@ qtModule {
     # Pass Nixpkgs' Darwin libc++, libresolv and compiler-rt paths into Chromium
     # GN, which drives an unwrapped clang that misses the cc-wrapper's setup.
     ./darwin-gn-toolchain-flags.patch
+
+    # Strip relative --sysroot/-isysroot from generated Darwin link response
+    # files so they don't override the correct absolute SDK. Upstreamable.
+    ./darwin-strip-relative-sysroot.patch
   ];
 
   postPatch = ''

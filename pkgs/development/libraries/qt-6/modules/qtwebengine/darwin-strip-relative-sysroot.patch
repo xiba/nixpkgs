@@ -1,0 +1,34 @@
+diff --git a/src/core/configure/BUILD.root.gn.in b/src/core/configure/BUILD.root.gn.in
+index 0333d75..ee15fb2 100644
+--- a/src/core/configure/BUILD.root.gn.in
++++ b/src/core/configure/BUILD.root.gn.in
+@@ -107,7 +107,7 @@ if (ozone_platform_x11) {
+ 
+ shared_library("QtWebEngineCore") {
+   rsp_types = [ "objects", "archives", "libs", "ldir", "lflags" ]
+-  lflags_remove = "(--sysroot=)(\\.\\./.*\\S*?)" # ignore sysroot with realative path
++  lflags_remove = "(--sysroot=|-isysroot\\s+)(\\.\\./.*\\S*?)" # ignore sysroot and isysroot with relative path
+   configs += [
+     ":cpp20_config",
+     ":QtWebEngineCore_config",
+@@ -835,6 +835,7 @@ if (enable_extensions) {
+ if (enable_spellcheck) {
+   shared_library("convert_dict") {
+     rsp_types = [ "objects", "archives", "libs", "ldir", "lflags" ]
++    lflags_remove = "(--sysroot=|-isysroot\\s+)(\\.\\./.*\\S*?)" # ignore sysroot and isysroot with relative path
+     configs += [ "//build/config/compiler:wexit_time_destructors" ]
+     deps = [
+       "//chrome/tools/convert_dict:lib",
+diff --git a/src/pdf/configure/BUILD.root.gn.in b/src/pdf/configure/BUILD.root.gn.in
+index 72d4558..93a0622 100644
+--- a/src/pdf/configure/BUILD.root.gn.in
++++ b/src/pdf/configure/BUILD.root.gn.in
+@@ -51,7 +51,7 @@ config("cpp20_config") {
+ static_library("QtPdf") {
+   complete_static_lib = true
+   rsp_types = [ "objects", "archives", "libs", "ldir", "lflags" ]
+-  lflags_remove = "(--sysroot=)(\\.\\./.*\\S*?)" # ignore sysroot with realative path
++  lflags_remove = "(--sysroot=|-isysroot\\s+)(\\.\\./.*\\S*?)" # ignore sysroot and isysroot with relative path
+   configs += [
+     ":cpp20_config",
+     ":QtPdf_config"
