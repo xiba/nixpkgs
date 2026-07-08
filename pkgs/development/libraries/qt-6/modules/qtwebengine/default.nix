@@ -135,6 +135,13 @@ qtModule {
         --replace "/usr/bin/env -S make -f" "/usr/bin/make -f" || true
       substituteInPlace third_party/webgpu-cts/src/tools/run_deno \
         --replace "/usr/bin/env -S deno" "/usr/bin/deno" || true
+
+      # On Darwin, patchShebangs hard-crashes on executable files that contain
+      # only a shebang and do not end with a final newline, so add a trailing
+      # newline to every executable first. See the same workaround in the
+      # Chromium package (pkgs/applications/networking/browsers/chromium/common.nix).
+      ${lib.optionalString stdenv.hostPlatform.isDarwin "find . -type f -perm -0100 -exec sed -i -e '$a\\' {} +"}
+
       patchShebangs .
     )
 
