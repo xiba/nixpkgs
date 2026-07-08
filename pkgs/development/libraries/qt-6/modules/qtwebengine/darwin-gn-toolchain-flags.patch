@@ -1,0 +1,113 @@
+diff --git a/cmake/QtToolchainHelpers.cmake b/cmake/QtToolchainHelpers.cmake
+index aca1fab..9c88335 100644
+--- a/cmake/QtToolchainHelpers.cmake
++++ b/cmake/QtToolchainHelpers.cmake
+@@ -419,6 +419,32 @@ macro(append_compiler_linker_sdk_setup)
+                 use_libcxx=true
+                 use_llvm_libatomic=false
+             )
++
++            if(QTWEBENGINE_NIX_LIBCXX_INCLUDE_DIR)
++                list(APPEND gnArgArg
++                    qtwebengine_libcxx_include_dir="${QTWEBENGINE_NIX_LIBCXX_INCLUDE_DIR}"
++                )
++            endif()
++            if(QTWEBENGINE_NIX_LIBCXX_LIBRARY_DIR)
++                list(APPEND gnArgArg
++                    qtwebengine_libcxx_library_dir="${QTWEBENGINE_NIX_LIBCXX_LIBRARY_DIR}"
++                )
++            endif()
++            if(QTWEBENGINE_NIX_LIBRESOLV_INCLUDE_DIR)
++                list(APPEND gnArgArg
++                    qtwebengine_libresolv_include_dir="${QTWEBENGINE_NIX_LIBRESOLV_INCLUDE_DIR}"
++                )
++            endif()
++            if(QTWEBENGINE_NIX_LIBRESOLV_LIBRARY_DIR)
++                list(APPEND gnArgArg
++                    qtwebengine_libresolv_library_dir="${QTWEBENGINE_NIX_LIBRESOLV_LIBRARY_DIR}"
++                )
++            endif()
++            if(QTWEBENGINE_NIX_COMPILER_RT_LIBRARY_DIR)
++                list(APPEND gnArgArg
++                    qtwebengine_compiler_rt_library_dir="${QTWEBENGINE_NIX_COMPILER_RT_LIBRARY_DIR}"
++                )
++            endif()
+             _qt_internal_get_apple_sdk_version(apple_sdk_version)
+             if (apple_sdk_version LESS 13.2)
+                 list(APPEND gnArgArg
+diff --git a/src/3rdparty/chromium/build/config/compiler/BUILD.gn b/src/3rdparty/chromium/build/config/compiler/BUILD.gn
+index 45d5edc..525fbd4 100644
+--- a/src/3rdparty/chromium/build/config/compiler/BUILD.gn
++++ b/src/3rdparty/chromium/build/config/compiler/BUILD.gn
+@@ -210,6 +210,24 @@ declare_args() {
+   # but ultimately the goal is for it to eventually be removed, once this mode
+   # is stable enough.
+   is_wexit_time_destructors_default = false
++
++  # Extra libc++ paths for downstream builds where the macOS toolchain invokes a
++  # Clang binary that does not know about the C++ standard library by itself.
++  # Nixpkgs uses this because Chromium's clang_base_path points at unwrapped clang.
++  qtwebengine_libcxx_include_dir = ""
++  qtwebengine_libcxx_library_dir = ""
++
++  # Extra libresolv paths for downstream builds whose SDK omits resolv.h and
++  # libresolv (e.g. Nixpkgs' Apple SDK ships them in a separate package). Passed
++  # as -isystem so third-party header diagnostics stay suppressed.
++  qtwebengine_libresolv_include_dir = ""
++  qtwebengine_libresolv_library_dir = ""
++
++  # Extra compiler-rt builtins directory for downstream builds where the macOS
++  # toolchain invokes an unwrapped Clang that does not auto-link
++  # libclang_rt.osx.a. Nixpkgs normally supplies this via the cc wrapper's
++  # -resource-dir, which Chromium's clang_base_path bypasses.
++  qtwebengine_compiler_rt_library_dir = ""
+ }
+ 
+ declare_args() {
+@@ -868,6 +886,46 @@ config("compiler") {
+     }
+   }
+ 
++  if (is_mac && is_qtwebengine) {
++    if (qtwebengine_libcxx_include_dir != "") {
++      cflags_cc += [
++        "-isystem",
++        qtwebengine_libcxx_include_dir,
++      ]
++    }
++
++    if (qtwebengine_libcxx_library_dir != "") {
++      ldflags += [
++        "-L" + qtwebengine_libcxx_library_dir,
++      ]
++    }
++
++    # Use cflags (not cflags_cc) so this also reaches Objective-C++ (.mm)
++    # sources, whose toolchain rule expands {{cflags}} but not {{cflags_cc}}.
++    if (qtwebengine_libresolv_include_dir != "") {
++      cflags += [
++        "-isystem",
++        qtwebengine_libresolv_include_dir,
++      ]
++    }
++
++    if (qtwebengine_libresolv_library_dir != "") {
++      ldflags += [
++        "-L" + qtwebengine_libresolv_library_dir,
++      ]
++    }
++
++    # Link compiler-rt builtins explicitly: the unwrapped Clang used by GN does
++    # not auto-link them, so Dawn's Metal backend and Blink otherwise fail with
++    # undefined ___divdc3 / ___isPlatformVersionAtLeast at the final link.
++    if (qtwebengine_compiler_rt_library_dir != "") {
++      ldflags += [
++        "-L" + qtwebengine_compiler_rt_library_dir,
++        "-lclang_rt.osx",
++      ]
++    }
++  }
++
+   # Add flags for link-time optimization. These flags enable
+   # optimizations/transformations that require whole-program visibility at link
+   # time, so they need to be applied to all translation units, and we may end up

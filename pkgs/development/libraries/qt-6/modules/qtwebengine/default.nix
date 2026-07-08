@@ -72,6 +72,7 @@
   bootstrap_cmds,
   cctools,
   xcbuild,
+  libresolv,
 }:
 
 qtModule {
@@ -123,6 +124,11 @@ qtModule {
 
     # Reproducibility QTBUG-136068
     ./gn-object-sorted.patch
+  ]
+  ++ lib.optionals stdenv.hostPlatform.isDarwin [
+    # Pass Nixpkgs' Darwin libc++, libresolv and compiler-rt paths into Chromium
+    # GN, which drives an unwrapped clang that misses the cc-wrapper's setup.
+    ./darwin-gn-toolchain-flags.patch
   ];
 
   postPatch = ''
@@ -212,6 +218,21 @@ qtModule {
   ]
   ++ lib.optionals stdenv.hostPlatform.isDarwin [
     "-DCMAKE_OSX_DEPLOYMENT_TARGET=11.0" # Per Qt 6’s deployment target (why doesn’t the hook work?)
+    "-DQTWEBENGINE_NIX_LIBCXX_INCLUDE_DIR=${lib.getInclude stdenv.cc.libcxx}/include/c++/v1"
+    "-DQTWEBENGINE_NIX_LIBCXX_LIBRARY_DIR=${lib.getLib stdenv.cc.libcxx}/lib"
+    # Nixpkgs' Apple SDK ships resolv.h/libresolv in a separate package rather
+    # than in the SDK, but Chromium's net stack (network_change_notifier_apple.mm)
+    # includes <resolv.h> and links -lresolv. The GN build uses an unwrapped
+    # clang with its own sysroot, so feed libresolv's paths in explicitly.
+    "-DQTWEBENGINE_NIX_LIBRESOLV_INCLUDE_DIR=${lib.getDev libresolv}/include"
+    "-DQTWEBENGINE_NIX_LIBRESOLV_LIBRARY_DIR=${lib.getLib libresolv}/lib"
+    # Chromium's clang_base_path points at the unwrapped clang, so the GN link
+    # step never picks up the compiler-rt builtins archive that the Nixpkgs cc
+    # wrapper would normally supply via -resource-dir. Dawn's Metal backend and
+    # Blink then fail to link (___divdc3, ___isPlatformVersionAtLeast). Feed the
+    # builtins library directory in explicitly so the final link resolves them.
+    # Sourced from stdenv.cc's own resource root to stay matched to the compiler.
+    "-DQTWEBENGINE_NIX_COMPILER_RT_LIBRARY_DIR=${stdenv.cc}/resource-root/lib/darwin"
   ];
 
   propagatedBuildInputs = [
@@ -292,6 +313,10 @@ qtModule {
 
   buildInputs = [
     cups
+  ]
+  ++ lib.optionals stdenv.hostPlatform.isDarwin [
+    # Chromium's net stack links -lresolv; Nixpkgs' Apple SDK provides it here.
+    libresolv
   ];
 
   requiredSystemFeatures = [ "big-parallel" ];

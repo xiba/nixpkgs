@@ -117,7 +117,7 @@ let
       qtwayland = callPackage ./modules/qtwayland.nix { };
       qtwebchannel = callPackage ./modules/qtwebchannel.nix { };
       qtwebengine = callPackage ./modules/qtwebengine {
-        inherit (darwin) bootstrap_cmds;
+        inherit (darwin) bootstrap_cmds libresolv;
       };
       qtwebsockets = callPackage ./modules/qtwebsockets.nix { };
       qtwebview = callPackage ./modules/qtwebview.nix { };
