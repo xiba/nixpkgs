@@ -73,6 +73,7 @@
   cctools,
   xcbuild,
   libresolv,
+  llvmPackages,
 }:
 
 qtModule {
@@ -98,6 +99,12 @@ qtModule {
     bootstrap_cmds
     cctools
     xcbuild
+    # Apple's cctools ld64 (1010.6) hits an internal SIGTRAP (Trace/BPT trap: 5,
+    # exit 133) when linking some of Chromium's large Mach-O outputs (e.g.
+    # v8_context_snapshot_generator). Chromium is designed to link with LLVM's
+    # lld, so provide ld64.lld and force Qt to use it on Darwin (see the
+    # -DINPUT_linker=lld cmakeFlag and the lld_path GN arg below).
+    llvmPackages.lld
   ];
   doCheck = true;
   outputs = [
@@ -222,6 +229,14 @@ qtModule {
   ]
   ++ lib.optionals stdenv.hostPlatform.isDarwin [
     "-DCMAKE_OSX_DEPLOYMENT_TARGET=11.0" # Per Qt 6’s deployment target (why doesn’t the hook work?)
+    # Link Chromium with LLVM lld instead of Apple's crashing cctools ld64 (see
+    # the llvmPackages.lld nativeBuildInput). darwin-gn-toolchain-flags.patch
+    # forces QT_FEATURE_use_lld_linker on when this path is set (INPUT_linker is
+    # a qtbase-configure option and is ignored by the qtwebengine build), which
+    # makes QtWebEngine emit "use_lld=true" for the Chromium GN build, and passes
+    # this directory as GN's lld_path so the unwrapped clang GN drives finds
+    # ld64.lld unambiguously ("-B <dir>") instead of relying on PATH.
+    "-DQTWEBENGINE_NIX_LLD_PATH=${lib.getBin llvmPackages.lld}/bin"
     "-DQTWEBENGINE_NIX_LIBCXX_INCLUDE_DIR=${lib.getInclude stdenv.cc.libcxx}/include/c++/v1"
     "-DQTWEBENGINE_NIX_LIBCXX_LIBRARY_DIR=${lib.getLib stdenv.cc.libcxx}/lib"
     # Nixpkgs' Apple SDK ships resolv.h/libresolv in a separate package rather

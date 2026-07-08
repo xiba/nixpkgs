@@ -2,7 +2,7 @@ diff --git a/cmake/QtToolchainHelpers.cmake b/cmake/QtToolchainHelpers.cmake
 index aca1fab..9c88335 100644
 --- a/cmake/QtToolchainHelpers.cmake
 +++ b/cmake/QtToolchainHelpers.cmake
-@@ -419,6 +419,32 @@ macro(append_compiler_linker_sdk_setup)
+@@ -419,6 +419,37 @@ macro(append_compiler_linker_sdk_setup)
                  use_libcxx=true
                  use_llvm_libatomic=false
              )
@@ -32,6 +32,11 @@ index aca1fab..9c88335 100644
 +                    qtwebengine_compiler_rt_library_dir="${QTWEBENGINE_NIX_COMPILER_RT_LIBRARY_DIR}"
 +                )
 +            endif()
++            if(QTWEBENGINE_NIX_LLD_PATH)
++                list(APPEND gnArgArg
++                    qtwebengine_lld_path="${QTWEBENGINE_NIX_LLD_PATH}"
++                )
++            endif()
              _qt_internal_get_apple_sdk_version(apple_sdk_version)
              if (apple_sdk_version LESS 13.2)
                  list(APPEND gnArgArg
@@ -39,10 +44,15 @@ diff --git a/src/3rdparty/chromium/build/config/compiler/BUILD.gn b/src/3rdparty
 index 45d5edc..525fbd4 100644
 --- a/src/3rdparty/chromium/build/config/compiler/BUILD.gn
 +++ b/src/3rdparty/chromium/build/config/compiler/BUILD.gn
-@@ -210,6 +210,24 @@ declare_args() {
+@@ -210,6 +210,29 @@ declare_args() {
    # but ultimately the goal is for it to eventually be removed, once this mode
    # is stable enough.
    is_wexit_time_destructors_default = false
++
++  # Directory containing ld64.lld, used to make the unwrapped Clang driven by GN
++  # link with LLVM lld instead of Apple's cctools ld64, which SIGTRAPs on some of
++  # Chromium's large Mach-O links. Empty means use the toolchain's default ld.
++  qtwebengine_lld_path = ""
 +
 +  # Extra libc++ paths for downstream builds where the macOS toolchain invokes a
 +  # Clang binary that does not know about the C++ standard library by itself.
@@ -64,7 +74,7 @@ index 45d5edc..525fbd4 100644
  }
  
  declare_args() {
-@@ -868,6 +886,46 @@ config("compiler") {
+@@ -868,6 +891,59 @@ config("compiler") {
      }
    }
  
@@ -104,6 +114,19 @@ index 45d5edc..525fbd4 100644
 +      ldflags += [
 +        "-L" + qtwebengine_compiler_rt_library_dir,
 +        "-lclang_rt.osx",
++      ]
++    }
++
++    # Link with LLVM lld instead of Apple's cctools ld64, which SIGTRAPs on some
++    # of Chromium's large Mach-O links (e.g. v8_context_snapshot_generator). This
++    # is applied as an explicit "-fuse-ld=lld" rather than GN's use_lld=true so
++    # the archiver stays Apple libtool and we avoid needing the full LLVM
++    # binutils suite (llvm-ar/nm/otool) beside the unwrapped clang. "-B" points
++    # that clang at ld64.lld.
++    if (qtwebengine_lld_path != "") {
++      ldflags += [
++        "-fuse-ld=lld",
++        "-B" + qtwebengine_lld_path,
 +      ]
 +    }
 +  }
