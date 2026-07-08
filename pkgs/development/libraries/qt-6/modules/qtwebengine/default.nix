@@ -164,6 +164,15 @@ qtModule {
   + lib.optionalString stdenv.hostPlatform.isDarwin ''
     substituteInPlace cmake/QtToolchainHelpers.cmake \
       --replace-fail "/usr/bin/xcrun" "${xcbuild}/bin/xcrun"
+
+    # The Metal toolchain (shipped with Xcode) is unavailable in the Nix build
+    # sandbox, which otherwise makes the "metal-toolchain" configure check fail
+    # and disables the whole QtWebEngine build. Force the check to pass. This is
+    # safe because nixpkgs also disables ANGLE Metal shader compilation, so this
+    # configure check must not be relied upon to infer that metal/metallib are
+    # actually available.
+    substituteInPlace configure.cmake \
+      --replace-fail "CONDITION NOT APPLE OR \''${TEST_metal_toolchain}" "CONDITION NOT APPLE OR TRUE"
   '';
 
   cmakeFlags = [
